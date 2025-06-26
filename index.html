@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Matrix Prank com Bips Estável</title>
+<style>
+  body {
+    margin: 0;
+    background: black;
+    overflow: hidden;
+    font-family: monospace;
+    color: #0F0;
+  }
+  #matrixCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 0;
+  }
+  #avisoFixo {
+    position: fixed;
+    top: 40px;
+    width: 100%;
+    text-align: center;
+    font-size: 1.5em;
+    z-index: 2;
+    pointer-events: none;
+  }
+  #avisoCentral {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 20px 30px;
+    background: rgba(0,0,0,0.8);
+    border-radius: 10px;
+    font-size: 2em;
+    text-align: center;
+    z-index: 3;
+    display: none;
+  }
+  #telaVerde {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: #0F0;
+    z-index: 4;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="matrixCanvas"></canvas>
+<div id="avisoFixo">Seus dados estão sendo deletados</div>
+<div id="avisoCentral"></div>
+<div id="telaVerde"></div>
+
+<script>
+  const canvas = document.getElementById('matrixCanvas');
+  const ctx = canvas.getContext('2d');
+  let width = canvas.width = window.innerWidth;
+  let height = canvas.height = window.innerHeight;
+
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const fontSize = 16;
+  const columns = Math.floor(width / fontSize);
+  const drops = Array(columns).fill(1);
+
+  function drawMatrix() {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = '#0F0';
+    ctx.font = fontSize + 'px monospace';
+
+    drops.forEach((y, i) => {
+      const text = letters[Math.floor(Math.random() * letters.length)];
+      const x = i * fontSize;
+      ctx.fillText(text, x, y * fontSize);
+      if (y * fontSize > height && Math.random() > 0.975) {
+        drops[i] = 0;
+      }
+      drops[i]++;
+    });
+  }
+
+  setInterval(drawMatrix, 33);
+
+  window.addEventListener('resize', () => {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+  });
+
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+  function beep(duration = 200, frequency = 1000, volume = 1) {
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.frequency.value = frequency;
+    oscillator.type = 'square';
+    gainNode.gain.value = volume;
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.start();
+
+    setTimeout(() => {
+      oscillator.stop();
+      oscillator.disconnect();
+      gainNode.disconnect();
+    }, duration);
+  }
+
+  function playBeeps(count, duration = 150, interval = 100, done) {
+    let played = 0;
+    function playNext() {
+      if (played < count) {
+        beep(duration, 1200, 1);
+        played++;
+        setTimeout(playNext, duration + interval);
+      } else if (done) {
+        done();
+      }
+    }
+    playNext();
+  }
+
+  const avisoCentral = document.getElementById('avisoCentral');
+  const telaVerde = document.getElementById('telaVerde');
+
+  let toqueCount = 0;
+  let bloqueado = false;
+  let ultimoToque = 0;
+
+  const tempoEntreToques = 1500;
+
+  function mostrarAviso(msg, tempo = 2000) {
+    avisoCentral.textContent = msg;
+    avisoCentral.style.display = 'block';
+    setTimeout(() => {
+      avisoCentral.style.display = 'none';
+    }, tempo);
+  }
+
+  function handleToque() {
+    if (bloqueado) return;
+
+    if (audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+
+    const agora = Date.now();
+    if (agora - ultimoToque < tempoEntreToques) return;
+    ultimoToque = agora;
+
+    toqueCount++;
+
+    if (toqueCount === 1) {
+      mostrarAviso('Toque detectado');
+      playBeeps(1);
+    } else if (toqueCount === 2) {
+      mostrarAviso('Se tocar mais uma vez seu aparelho será inativado', 3000);
+      playBeeps(1);
+    } else if (toqueCount === 3) {
+      bloqueado = true;
+      mostrarAviso('Desativando aparelho', 2000);
+      playBeeps(3);
+      setTimeout(() => {
+        telaVerde.style.display = 'block';
+        document.body.style.pointerEvents = 'none';
+      }, 2000);
+    }
+  }
+
+  setTimeout(() => {
+    mostrarAviso('Não toque na tela');
+  }, 2000);
+
+  window.addEventListener('click', handleToque);
+  window.addEventListener('touchstart', handleToque);
+</script>
+
+</body>
+</html>
